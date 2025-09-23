@@ -7,6 +7,7 @@ class TaskController {
       const userId = req.user.id;
       const { 
         project_id, 
+        label_id,
         completed = false, 
         due_date,
         priority,
@@ -29,41 +30,62 @@ class TaskController {
       }
 
       if (due_date) {
-        const date = new Date(due_date);
-        if (!isNaN(date.getTime())) {
+        if (due_date === 'upcoming') {
+          const today = new Date();
+          const tomorrow = new Date(today);
+          tomorrow.setDate(today.getDate() + 1);
+          const nextWeek = new Date(today);
+          nextWeek.setDate(today.getDate() + 7);
+          
           whereClause.due_date = {
             [Op.between]: [
-              new Date(date.setHours(0, 0, 0, 0)),
-              new Date(date.setHours(23, 59, 59, 999))
+              new Date(tomorrow.setHours(0, 0, 0, 0)),
+              new Date(nextWeek.setHours(23, 59, 59, 999))
             ]
           };
+        } else {
+          const date = new Date(due_date);
+          if (!isNaN(date.getTime())) {
+            whereClause.due_date = {
+              [Op.between]: [
+                new Date(date.setHours(0, 0, 0, 0)),
+                new Date(date.setHours(23, 59, 59, 999))
+              ]
+            };
+          }
         }
       }
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
 
+      const includeArray = [
+        {
+          model: Project,
+          as: 'project',
+          attributes: ['id', 'name', 'color']
+        },
+        {
+          model: Label,
+          as: 'labels',
+          through: { attributes: [] },
+          attributes: ['id', 'name', 'color'],
+          ...(label_id && {
+            where: { id: parseInt(label_id) },
+            required: true
+          })
+        },
+        {
+          model: Task,
+          as: 'subtasks',
+          attributes: ['id', 'title', 'completed'],
+          where: { completed: false },
+          required: false
+        }
+      ];
+
       const { count, rows: tasks } = await Task.findAndCountAll({
         where: whereClause,
-        include: [
-          {
-            model: Project,
-            as: 'project',
-            attributes: ['id', 'name', 'color']
-          },
-          {
-            model: Label,
-            as: 'labels',
-            through: { attributes: [] },
-            attributes: ['id', 'name', 'color']
-          },
-          {
-            model: Task,
-            as: 'subtasks',
-            attributes: ['id', 'title', 'completed'],
-            where: { completed: false },
-            required: false
-          }
-        ],
+        include: includeArray,
         order: [
           ['completed', 'ASC'],
           ['priority', 'DESC'],
@@ -76,7 +98,8 @@ class TaskController {
       });
 
       res.json({
-        tasks: tasks.map(task => ({
+        success: true,
+        data: tasks.map(task => ({
           id: task.id,
           title: task.title,
           description: task.description,
@@ -91,10 +114,10 @@ class TaskController {
           updated_at: task.updated_at
         })),
         pagination: {
-          current_page: parseInt(page),
-          total_pages: Math.ceil(count / parseInt(limit)),
-          total_count: count,
-          per_page: parseInt(limit)
+          page: parseInt(page),
+          totalPages: Math.ceil(count / parseInt(limit)),
+          total: count,
+          limit: parseInt(limit)
         }
       });
     } catch (error) {
@@ -219,8 +242,9 @@ class TaskController {
       });
 
       res.status(201).json({
+        success: true,
         message: 'Task created successfully',
-        task: {
+        data: {
           id: createdTask.id,
           title: createdTask.title,
           description: createdTask.description,
@@ -372,8 +396,9 @@ class TaskController {
       });
 
       res.json({
+        success: true,
         message: 'Task updated successfully',
-        task: {
+        data: {
           id: updatedTask.id,
           title: updatedTask.title,
           description: updatedTask.description,
@@ -421,9 +446,139 @@ class TaskController {
 
       await task.destroy();
 
-      res.json({ message: 'Task deleted successfully' });
+      res.json({ success: true, message: 'Task deleted successfully' });
     } catch (error) {
       console.error('Delete task error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  static async completeTask(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+
+      const task = await Task.findOne({
+        where: { 
+          id: parseInt(id),
+          user_id: userId 
+        }
+      });
+
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      if (task.completed) {
+        return res.status(400).json({ error: 'Task is already completed' });
+      }
+
+      await task.update({
+        completed: true,
+        completed_at: new Date()
+      });
+
+      const completedTask = await Task.findByPk(task.id, {
+        include: [
+          {
+            model: Project,
+            as: 'project',
+            attributes: ['id', 'name', 'color']
+          },
+          {
+            model: Label,
+            as: 'labels',
+            through: { attributes: [] },
+            attributes: ['id', 'name', 'color']
+          }
+        ]
+      });
+
+      res.json({
+        success: true,
+        message: 'Task completed successfully',
+        data: {
+          id: completedTask.id,
+          title: completedTask.title,
+          description: completedTask.description,
+          completed: completedTask.completed,
+          completed_at: completedTask.completed_at,
+          due_date: completedTask.due_date,
+          priority: completedTask.priority,
+          sort_order: completedTask.sort_order,
+          project: completedTask.project,
+          labels: completedTask.labels || [],
+          created_at: completedTask.created_at,
+          updated_at: completedTask.updated_at
+        }
+      });
+    } catch (error) {
+      console.error('Complete task error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  static async uncompleteTask(req, res) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+
+      const task = await Task.findOne({
+        where: { 
+          id: parseInt(id),
+          user_id: userId 
+        }
+      });
+
+      if (!task) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      if (!task.completed) {
+        return res.status(400).json({ error: 'Task is not completed' });
+      }
+
+      await task.update({
+        completed: false,
+        completed_at: null
+      });
+
+      const uncompletedTask = await Task.findByPk(task.id, {
+        include: [
+          {
+            model: Project,
+            as: 'project',
+            attributes: ['id', 'name', 'color']
+          },
+          {
+            model: Label,
+            as: 'labels',
+            through: { attributes: [] },
+            attributes: ['id', 'name', 'color']
+          }
+        ]
+      });
+
+      res.json({
+        success: true,
+        message: 'Task marked as incomplete',
+        data: {
+          id: uncompletedTask.id,
+          title: uncompletedTask.title,
+          description: uncompletedTask.description,
+          completed: uncompletedTask.completed,
+          completed_at: uncompletedTask.completed_at,
+          due_date: uncompletedTask.due_date,
+          priority: uncompletedTask.priority,
+          sort_order: uncompletedTask.sort_order,
+          project: uncompletedTask.project,
+          labels: uncompletedTask.labels || [],
+          created_at: uncompletedTask.created_at,
+          updated_at: uncompletedTask.updated_at
+        }
+      });
+    } catch (error) {
+      console.error('Uncomplete task error:', error);
       res.status(500).json({ error: 'Internal server error' });
     }
   }

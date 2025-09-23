@@ -33,7 +33,8 @@ class ProjectController {
       });
 
       res.json({
-        projects: projects.map(project => ({
+        success: true,
+        data: projects.map(project => ({
           id: project.id,
           name: project.name,
           description: project.description,
@@ -87,8 +88,9 @@ class ProjectController {
       });
 
       res.status(201).json({
+        success: true,
         message: 'Project created successfully',
-        project: {
+        data: {
           id: project.id,
           name: project.name,
           description: project.description,
@@ -167,8 +169,9 @@ class ProjectController {
       await project.update(updateData);
 
       res.json({
+        success: true,
         message: 'Project updated successfully',
-        project: {
+        data: {
           id: project.id,
           name: project.name,
           description: project.description,
@@ -213,7 +216,7 @@ class ProjectController {
 
       await project.destroy();
 
-      res.json({ message: 'Project deleted successfully' });
+      res.json({ success: true, message: 'Project deleted successfully' });
     } catch (error) {
       console.error('Delete project error:', error);
       res.status(500).json({ error: 'Internal server error' });

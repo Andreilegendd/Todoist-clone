@@ -4,6 +4,7 @@ import AuthController from "../controllers/authController.js";
 import UserController from "../controllers/userController.js";
 import ProjectController from "../controllers/projectController.js";
 import TaskController from "../controllers/taskController.js";
+import LabelController from "../controllers/labelController.js";
 
 const router = express.Router();
 
@@ -33,6 +34,14 @@ protectedRoutes.get("/tasks", TaskController.getAllTasks);
 protectedRoutes.post("/tasks", TaskController.createTask);
 protectedRoutes.put("/tasks/:id", TaskController.updateTask);
 protectedRoutes.delete("/tasks/:id", TaskController.deleteTask);
+protectedRoutes.patch("/tasks/:id/complete", TaskController.completeTask);
+protectedRoutes.patch("/tasks/:id/uncomplete", TaskController.uncompleteTask);
+
+// Label routes
+protectedRoutes.get("/labels", LabelController.getAllLabels);
+protectedRoutes.post("/labels", LabelController.createLabel);
+protectedRoutes.put("/labels/:id", LabelController.updateLabel);
+protectedRoutes.delete("/labels/:id", LabelController.deleteLabel);
 
 router.use("/", protectedRoutes);
 
