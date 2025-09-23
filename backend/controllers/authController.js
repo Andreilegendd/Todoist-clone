@@ -47,18 +47,24 @@ class AuthController {
 
       res.cookie('session', sessionToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        expires: expiresAt
+        secure: false,
+        sameSite: 'lax',
+        expires: expiresAt,
+        path: '/'
       });
 
       res.status(201).json({
+        success: true,
         message: 'User registered successfully',
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+          },
+          token: sessionToken,
+          expiresAt: expiresAt.toISOString()
         }
       });
     } catch (error) {
@@ -101,7 +107,7 @@ class AuthController {
       });
 
       const sessionToken = uuidv4();
-      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 дней
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
       await UserSession.create({
         token: sessionToken,
@@ -111,18 +117,24 @@ class AuthController {
 
       res.cookie('session', sessionToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        expires: expiresAt
+        secure: false,
+        sameSite: 'lax',
+        expires: expiresAt,
+        path: '/'
       });
 
       res.json({
+        success: true,
         message: 'Login successful',
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+          },
+          token: sessionToken,
+          expiresAt: expiresAt.toISOString()
         }
       });
     } catch (error) {

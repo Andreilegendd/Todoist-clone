@@ -1,4 +1,3 @@
-import jwt from 'jsonwebtoken';
 import { User, UserSession } from '../models/associations.js';
 
 export const authMiddleware = async (req, res, next) => {
@@ -22,14 +21,11 @@ export const authMiddleware = async (req, res, next) => {
       await session.destroy();
       return res.status(401).json({ error: 'Session expired' });
     }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default-secret');
-    
     req.user = {
-      id: decoded.userId || decoded.id,
-      email: decoded.email,
+      id: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
       role: session.user.role,
-      ...decoded
     };
     req.session = session;
     next();
